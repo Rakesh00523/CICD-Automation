@@ -96,18 +96,39 @@ cd client
 npm test        # Vitest + Testing Library
 ```
 
+## Verification performed
+
+Every claim above was actually run on the dev machine, not just written:
+
+- `npm install` succeeded in both `server/` and `client/`.
+- `npm test` in `server/`: **7/7 passing** (Jest + Supertest against an
+  in-memory MongoDB). Initial run hit the default 5s Jest hook timeout
+  because `mongodb-memory-server` downloads a MongoDB binary on first use —
+  fixed via `server/jest.config.js` (`testTimeout: 30000`).
+- `npm run lint` clean in both `server/` and `client/`.
+- `npm test` in `client/`: **1/1 passing** (Vitest + Testing Library).
+- `npm run build` in `client/` produced a production bundle
+  (`dist/`, ~217 KB JS / ~73 KB gzipped).
+- Ran the real dev server against the real local MongoDB service (not the
+  in-memory test DB): seeded 5 products, hit `GET /health` and
+  `GET /api/products` over HTTP, then `POST /api/checkout` for 2× a $34.25
+  item — got back a confirmed order with `total: 68.5`, and confirmed the
+  product's `stock` dropped from 30 to 28 via a follow-up `GET`. Data was
+  reseeded to a clean state afterward.
+
 ## Tasks accomplished
 
 - [x] Repository structure (`client/`, `server/`, `docs/`, `.github/`)
 - [x] Product catalog + product detail API and UI
 - [x] Client-side cart
 - [x] Mock checkout (server-validated, no real payment)
-- [x] Backend test suite (in-memory Mongo, no external dependency)
-- [x] Frontend component test
+- [x] Backend test suite (in-memory Mongo, no external dependency) — verified passing
+- [x] Frontend component test — verified passing
 - [x] Basic CI workflow: install → lint → test → build, on every push/PR
-- [x] Node.js and Git installed on the dev machine
-- [ ] First commit pushed to a GitHub repository (pending: repo not yet
-      connected to a GitHub remote)
+- [x] Node.js, Git, and MongoDB Community Server installed on the dev machine
+- [x] Local git repository initialized with the first commit
+- [ ] Pushed to a GitHub remote (pending: no remote configured yet — needed
+      before the CI workflow can actually run on GitHub Actions)
 
 ## What's next (Phase 2)
 

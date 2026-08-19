@@ -17,7 +17,7 @@ docs/     One markdown document per project phase
 
 | # | Phase | Status | Doc |
 |---|-------|--------|-----|
-| 1 | Foundation (app + basic CI) | In progress | [docs/phase-1.md](docs/phase-1.md) |
+| 1 | Foundation (app + basic CI) | Complete (local) | [docs/phase-1.md](docs/phase-1.md) |
 | 2 | Code Quality + AI Review (SonarQube + Claude API) | Not started | — |
 | 3 | Containerization (Docker) | Not started | — |
 | 4 | Supply Chain Security (Trivy, Syft, Cosign) | Not started | — |
