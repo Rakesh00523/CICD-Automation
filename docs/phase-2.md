@@ -86,11 +86,23 @@ fixed here rather than left for later:
   behavior change between react-router v6 and v7 that a unit test wouldn't
   surface. Screenshots confirmed real product data rendering and a correct
   order confirmation (`Total: $34.25`, cart reset to 0 after purchase).
-- Result: **0 vulnerabilities** (`npm audit`), confirmed working end-to-end.
-- One remaining non-fatal warning: `@vitejs/plugin-react@4.7.0`'s declared
-  peer range doesn't yet officially list vite 8; everything tested clean
-  regardless. Worth revisiting when `@vitejs/plugin-react` cuts a release
-  that explicitly supports vite 8.
+- Result: **0 vulnerabilities** (`npm audit`).
+- **This wasn't actually done yet — CI caught what local testing missed.**
+  `npm audit fix --force` used `--force`, which silently accepted a peer
+  dependency conflict: `@vitejs/plugin-react@4.7.0` doesn't support vite 8.
+  `npm install` tolerates that (with a warning); `npm ci` — what the CI
+  workflow actually runs — does not, and fails hard on it. Local testing
+  used `npm install`, so this passed locally and only surfaced when GitHub
+  Actions ran `npm ci` and the client job failed. Fixed by bumping
+  `@vitejs/plugin-react` to `^6.1.0`, the first major version whose
+  `peerDependencies` explicitly declare `vite: ^8.0.0`. Re-verified with a
+  from-scratch `npm ci` locally (matching CI exactly), plus lint, coverage
+  tests, build, and a second full Playwright walkthrough — all clean, and
+  the earlier esbuild-deprecation warnings from the mismatched plugin are
+  gone too.
+- **Lesson applied going forward:** verify dependency changes with `npm ci`
+  (not `npm install`) before treating them as done, since that's what CI
+  actually runs and the two can silently disagree.
 
 ## Verification performed
 
@@ -119,7 +131,12 @@ Two external accounts/secrets need to be configured by the repo owner:
      account, import `Rakesh00523/CICD-Automation` as a new project.
    - Confirm the generated **Organization Key** and **Project Key** match
      `sonar.organization` / `sonar.projectKey` in `sonar-project.properties`
-     — SonarCloud sometimes appends a suffix; adjust the file if so.
+     — SonarCloud sometimes appends a suffix; adjust the file if so. (A
+     `.vscode/settings.json` with SonarLint connected-mode config appeared
+     during this phase pointing at `rakesh00523` /
+     `Rakesh00523_CICD-Automation`, matching what's in
+     `sonar-project.properties` — good sign these guessed defaults are
+     actually correct.)
    - Generate a token (My Account → Security) and add it as a GitHub Actions
      secret named `SONAR_TOKEN` (repo Settings → Secrets and variables →
      Actions).
