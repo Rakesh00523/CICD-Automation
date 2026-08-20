@@ -10,6 +10,7 @@
     "dev": "nodemon src/index.js",
     "seed": "node src/seed/seedProducts.js",
     "test": "jest --runInBand",
+    "test:coverage": "jest --runInBand --coverage",
     "lint": "eslint src"
   },
   "dependencies": {
