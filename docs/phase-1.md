@@ -127,8 +127,10 @@ Every claim above was actually run on the dev machine, not just written:
 - [x] Basic CI workflow: install → lint → test → build, on every push/PR
 - [x] Node.js, Git, and MongoDB Community Server installed on the dev machine
 - [x] Local git repository initialized with the first commit
-- [ ] Pushed to a GitHub remote (pending: no remote configured yet — needed
-      before the CI workflow can actually run on GitHub Actions)
+- [x] Pushed to GitHub (https://github.com/Rakesh00523/CICD-Automation,
+      `main` branch) — CI workflow confirmed **green** on GitHub Actions
+      (both `server` and `client` jobs passed on commit `7b8ff0b`, verified
+      via the Actions REST API)
 
 ## What's next (Phase 2)
 
