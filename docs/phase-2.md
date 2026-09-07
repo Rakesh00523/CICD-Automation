@@ -4,7 +4,7 @@
 
 Attach two independent review layers to every pull request against `main`,
 on top of the Phase 1 CI (lint/test/build): static analysis via SonarCloud,
-and an AI-generated review comment from the Claude API that specifically
+and an AI-generated review comment from an LLM API that specifically
 targets logic errors, security issues, and anti-patterns a linter/SonarQube
 rule set wouldn't catch.
 
@@ -19,11 +19,12 @@ rule set wouldn't catch.
   substance; self-hosted SonarQube can be swapped in later without changing
   the app code, only the CI job.
 - **Custom script over a pre-built "AI review" GitHub Action.** A hand-written
-  script (`scripts/ai-review.mjs`) calling the Anthropic API directly, using
+  script (`scripts/ai-review.mjs`) calling the LLM API directly, using
   only Node's built-in `fetch` (no dependencies), rather than a third-party
   marketplace action. For a project whose point is explaining *how* AI
-  review works, an opaque marketplace action is a worse fit than ~130 lines
-  of readable, fully-owned code.
+  review works, an opaque marketplace action is a worse fit than ~150 lines
+  of readable, fully-owned code. It also made switching providers (see
+  below) a same-day change instead of a re-architecture.
 - **Update-in-place PR comments.** The script looks for a previous AI-review
   comment (marked with an HTML comment) and PATCHes it instead of posting a
   new one on every push to a PR branch — otherwise a PR with several commits
@@ -36,15 +37,37 @@ rule set wouldn't catch.
 - Fetches the PR's unified diff from the GitHub REST API, truncates to
   60,000 characters if needed (guards against runaway token cost on huge
   diffs).
-- Sends the diff to Claude (`claude-sonnet-5` by default, overridable via
-  `CLAUDE_MODEL`) with a prompt scoped specifically to logic errors,
-  security vulnerabilities, and anti-patterns — explicitly told to ignore
-  style issues, since lint already covers those.
+- Sends the diff to an LLM with a prompt scoped specifically to logic
+  errors, security vulnerabilities, and anti-patterns — explicitly told to
+  ignore style issues, since lint already covers those.
 - Posts the review as a PR comment, or updates its own previous comment if
   one already exists on that PR.
-- Fails loudly (non-zero exit) if `ANTHROPIC_API_KEY` is missing, rather than
-  silently skipping — a misconfigured secret should be visible in the
-  Actions run, not swallowed.
+- Fails loudly (non-zero exit) if the provider's API key secret is missing,
+  rather than silently skipping — a misconfigured secret should be visible
+  in the Actions run, not swallowed.
+
+**Provider switch: Claude API → Gemini API.** Originally built against the
+Claude API (`claude-sonnet-5`). Live-tested it on a real PR once
+`ANTHROPIC_API_KEY` was configured — the workflow ran correctly end-to-end
+(env vars passed through, diff fetched, API called, response handled) but
+failed on `Your credit balance is too low to access the Anthropic API`:
+Claude Pro/Max subscriptions and Anthropic Console API billing are
+separate products: a chat subscription doesn't fund API usage, and the
+Console needs its own prepaid credits. Rather than requiring a purchase
+for a student project, switched the script to Google's Gemini API
+(`gemini-2.5-flash` by default, overridable via `GEMINI_MODEL`), which
+offers a genuinely free tier (no billing setup, rate-limited) via
+[Google AI Studio](https://aistudio.google.com/apikey). Confirmed the
+current `generateContent` REST endpoint, request/response shape, and
+`gemini-2.5-flash` model availability directly against Google's docs
+before writing the code, rather than trust knowledge that might be stale.
+Only `scripts/ai-review.mjs` (API call function + env var names) and
+`ai-review.yml` (secret name) needed to change — the diff-fetching,
+comment update-in-place logic, and truncation guard were untouched,
+validating the "own the integration code" decision above. Re-verified the
+full control flow (request shape, auth header, POST-vs-PATCH comment
+logic, and a new edge case — Gemini's safety-filter block response) against
+a stubbed API before pushing.
 
 **SonarCloud (`sonar-project.properties` + `.github/workflows/sonar.yml`)**
 - Runs both test suites with coverage (`test:coverage` in both `server/`
@@ -221,15 +244,16 @@ scan step reads them.
 
 ## Manual setup required (cannot be done by an agent)
 
-One external secret is still outstanding:
-
 1. ~~SonarCloud~~ — **done.** Project imported, set to CI-based analysis,
    `SONAR_TOKEN` added, both `CI` and `SonarCloud` workflows confirmed
    green on GitHub Actions.
-2. **Anthropic API key** — still needed:
-   - Create an API key at [console.anthropic.com](https://console.anthropic.com).
-   - Add it as a GitHub Actions secret named `ANTHROPIC_API_KEY` (repo
-     Settings → Secrets and variables → Actions).
+2. **Gemini API key** (replaces the Anthropic key — see the provider
+   switch above):
+   - Create a free key at [Google AI Studio](https://aistudio.google.com/apikey)
+     (no billing setup required for the free tier).
+   - Add it as a GitHub Actions secret named `GEMINI_API_KEY` (repo
+     Settings → Secrets and variables → Actions) — remove the old
+     `ANTHROPIC_API_KEY` secret if it's still there, it's unused now.
 
 Once that's added, open any PR against `main` to see the AI review comment
 appear.
@@ -238,7 +262,7 @@ appear.
 
 - [x] SonarCloud config (`sonar-project.properties`) and CI job
 - [x] Coverage reporting wired up in both `server/` and `client/` test suites
-- [x] Custom Claude API PR-review script + CI job
+- [x] Custom LLM PR-review script + CI job
 - [x] Update-in-place comment logic (no duplicate reviews per PR)
 - [x] Found and fixed 8 dependency vulnerabilities (0 remaining) surfaced
       while adding the coverage tooling
@@ -263,8 +287,13 @@ appear.
       successful analyses (Automatic Analysis vs. CI-analysis conflict) —
       switched SonarCloud project to CI-based analysis, rotated the token,
       verified both `CI` and `SonarCloud` workflows green on a fresh push
-- [ ] Real Claude-generated review comment on a live PR (blocked on
-      `ANTHROPIC_API_KEY` secret)
+- [x] Diagnosed the Claude API billing failure on a live PR (Console API
+      credits are separate from a Claude Pro/Max subscription), and
+      switched the provider to Gemini (free tier) rather than require a
+      purchase — verified the new control flow against a stubbed API,
+      including Gemini's safety-filter-block edge case
+- [ ] Real Gemini-generated review comment on a live PR (blocked on
+      `GEMINI_API_KEY` secret)
 
 ## What's next (Phase 3)
 

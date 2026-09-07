@@ -1,9 +1,9 @@
-// AI code review step for pull requests. Fetches the PR diff, asks Claude to
+// AI code review step for pull requests. Fetches the PR diff, asks Gemini to
 // review it for logic errors, security issues, and anti-patterns, then posts
 // (or updates) a single PR comment with the result.
 //
-// Required env vars: ANTHROPIC_API_KEY, GITHUB_TOKEN, GITHUB_REPOSITORY, PR_NUMBER
-// Optional: CLAUDE_MODEL (default: claude-sonnet-5)
+// Required env vars: GEMINI_API_KEY, GITHUB_TOKEN, GITHUB_REPOSITORY, PR_NUMBER
+// Optional: GEMINI_MODEL (default: gemini-2.5-flash)
 
 const COMMENT_MARKER = '<!-- ai-review-bot -->';
 const MAX_DIFF_CHARS = 60000;
@@ -63,49 +63,50 @@ async function upsertComment(repo, prNumber, token, body) {
   }
 }
 
-async function reviewWithClaude(apiKey, model, diff) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
+async function reviewWithGemini(apiKey, model, diff) {
+  const prompt = [
+    'You are reviewing a pull request diff for an e-commerce application (React + Node/Express + MongoDB).',
+    'Focus only on: logical errors/bugs, security vulnerabilities, and coding anti-patterns.',
+    'Ignore style nits that a linter would already catch.',
+    'For each issue: file/line if identifiable, a one-line description, and severity (High/Medium/Low).',
+    'If you find nothing notable, say so briefly. Keep the whole review under 400 words, formatted as markdown.',
+    '',
+    'Diff:',
+    '```diff',
+    diff,
+    '```',
+  ].join('\n');
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    {
+      method: 'POST',
+      headers: {
+        'x-goog-api-key': apiKey,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 2000 },
+      }),
     },
-    body: JSON.stringify({
-      model,
-      max_tokens: 2000,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            'You are reviewing a pull request diff for an e-commerce application (React + Node/Express + MongoDB).',
-            'Focus only on: logical errors/bugs, security vulnerabilities, and coding anti-patterns.',
-            'Ignore style nits that a linter would already catch.',
-            'For each issue: file/line if identifiable, a one-line description, and severity (High/Medium/Low).',
-            'If you find nothing notable, say so briefly. Keep the whole review under 400 words, formatted as markdown.',
-            '',
-            'Diff:',
-            '```diff',
-            diff,
-            '```',
-          ].join('\n'),
-        },
-      ],
-    }),
-  });
+  );
   if (!res.ok) {
-    throw new Error(`Anthropic API failed: ${res.status} ${await res.text()}`);
+    throw new Error(`Gemini API failed: ${res.status} ${await res.text()}`);
   }
   const data = await res.json();
-  return data.content?.[0]?.text ?? '(no response text)';
+  if (data.promptFeedback?.blockReason) {
+    return `(review blocked by Gemini safety filters: ${data.promptFeedback.blockReason})`;
+  }
+  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '(no response text)';
 }
 
 async function main() {
-  const apiKey = requireEnv('ANTHROPIC_API_KEY');
+  const apiKey = requireEnv('GEMINI_API_KEY');
   const githubToken = requireEnv('GITHUB_TOKEN');
   const repo = requireEnv('GITHUB_REPOSITORY');
   const prNumber = requireEnv('PR_NUMBER');
-  const model = process.env.CLAUDE_MODEL || 'claude-sonnet-5';
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
   let diff = await fetchDiff(repo, prNumber, githubToken);
   let truncated = false;
@@ -119,11 +120,11 @@ async function main() {
     return;
   }
 
-  const review = await reviewWithClaude(apiKey, model, diff);
+  const review = await reviewWithGemini(apiKey, model, diff);
 
   const body = [
     COMMENT_MARKER,
-    '## 🤖 AI Code Review (Claude)',
+    '## 🤖 AI Code Review (Gemini)',
     '',
     review,
     truncated ? '\n> Note: diff was truncated to fit the review context.' : '',

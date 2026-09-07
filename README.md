@@ -18,7 +18,7 @@ docs/     One markdown document per project phase
 | # | Phase | Status | Doc |
 |---|-------|--------|-----|
 | 1 | Foundation (app + basic CI) | Complete | [docs/phase-1.md](docs/phase-1.md) |
-| 2 | Code Quality + AI Review (SonarCloud + Claude API) | SonarCloud live and green; AI review pending API key | [docs/phase-2.md](docs/phase-2.md) |
+| 2 | Code Quality + AI Review (SonarCloud + Gemini API) | SonarCloud live and green; AI review pending Gemini API key | [docs/phase-2.md](docs/phase-2.md) |
 | 3 | Containerization (Docker) | Not started | — |
 | 4 | Supply Chain Security (Trivy, Syft, Cosign) | Not started | — |
 | 5 | GitOps Deployment (Minikube + ArgoCD) | Not started | — |
