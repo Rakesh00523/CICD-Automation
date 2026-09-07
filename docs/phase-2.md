@@ -158,10 +158,9 @@ fixed here rather than left for later:
   it (a) fetches the diff, (b) calls the Claude API with it, (c) posts a
   new comment when none exists, and (d) PATCHes its existing comment
   instead of duplicating one on a second run for the same PR.
-- **Not yet verified end-to-end**: an actual SonarCloud scan, and an actual
-  Claude-generated review comment on a real PR. Both require account-level
-  setup only the repo owner can do (see below) — this is the honest state,
-  not a completed one, until that setup happens and a real PR is opened.
+- Both an actual SonarCloud scan and an actual AI-generated review comment
+  were later verified end-to-end on a real PR (see below) — everything
+  above this line was written before that verification happened.
 
 ## SonarCloud went live — what it actually found
 
@@ -216,6 +215,27 @@ the real server and confirmed `GET /api/products?category[$ne]=Visible`
 now returns all products (operator key stripped to an empty filter) while
 a real category filter (`?category=Nonexistent`) still correctly returns
 zero results — plus the full test suite and lint still pass.
+
+**Still flagged after the global middleware too — properly triaged as a
+false positive rather than further code changes.** The next SonarCloud
+analysis on `main` still reported the *identical* finding, unchanged,
+confirming the rule does shallow single-file taint analysis: it can't see
+that a request value is sanitized by middleware registered elsewhere in
+the app, only whether a `req.query`-derived value reaches a Mongoose
+filter within the same function. Considered forcing a hardcoded category
+allowlist (a pattern more SAST tools recognize as taint-clearing), but
+`Product.category` is intentionally free-text with no fixed schema enum —
+artificially restricting it would trade away real product flexibility
+just to satisfy one rule's pattern-matching, which is worse than the
+finding itself. With the fix already verified two independent ways
+(regression test + live smoke test against the running server), this is
+the standard "confirmed false positive" situation every SAST tool
+produces sometimes. Marked resolved directly in SonarCloud
+(`False Positive`, with a comment explaining both mitigations) rather than
+distorting the code to chase an opaque rule. Confirmed via the
+Quality Gate API afterward: **all 6 conditions pass** (`New Security
+Rating: OK`, `New Code Coverage: 82.4%`, `Security Hotspots Reviewed:
+100%`, 0% duplication) — overall status `OK`.
 
 **CI hardening findings — fixed where safe, deliberately not where unsafe.**
 Sonar flagged four `npm ci` steps (in `ci.yml` and `sonar.yml`, one per
@@ -358,6 +378,12 @@ backoff). All documented above as they happened.
       — correctly flagged a genuine, separate race-condition concern
 - [x] Real SonarCloud Quality Gate confirmed passing on a live PR — 100%
       new-code coverage, 0 duplication, 0 new issues
+- [x] Applied `express-mongo-sanitize` globally as defense-in-depth after
+      SonarCloud kept flagging the already-fixed injection on `main`;
+      when the finding persisted even after that, properly triaged and
+      resolved it as a false positive in SonarCloud (with justification)
+      rather than distorting the schema to chase the rule — confirmed via
+      the Quality Gate API afterward: all 6 conditions pass, status `OK`
 
 ## What's next (Phase 3)
 
