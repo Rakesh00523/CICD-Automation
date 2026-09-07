@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const mongoSanitize = require('express-mongo-sanitize');
 const productsRouter = require('./routes/products');
 const checkoutRouter = require('./routes/checkout');
 
@@ -9,6 +10,10 @@ function createApp() {
 
   app.use(cors({ origin: process.env.CLIENT_ORIGIN || '*' }));
   app.use(express.json());
+  // Strips any request key starting with '$' or containing '.' from
+  // req.body/req.query/req.params, so a MongoDB query operator (e.g.
+  // ?category[$ne]=x) can never reach a Mongoose filter as a live operator.
+  app.use(mongoSanitize());
   if (process.env.NODE_ENV !== 'test') {
     app.use(morgan('dev'));
   }

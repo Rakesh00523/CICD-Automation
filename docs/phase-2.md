@@ -195,6 +195,28 @@ dropped). **Verified the test has real teeth** — temporarily reverted the
 fix and confirmed the test fails with exactly the predicted vulnerable
 behavior, then restored the fix and confirmed it passes again.
 
+**SonarCloud kept flagging the same line after the fix — a static-analysis
+limitation, addressed with a more robust fix anyway.** After merging the
+`typeof` guard above, SonarCloud's *next* analysis on `main` still reported
+the identical `jssecurity:S5147` finding on the same line, and the
+project's Quality Gate showed **Failed**. The functional fix was already
+verified correct (the regression test above proves it), so this wasn't a
+real remaining vulnerability — SonarQube's taint tracker most likely does
+shallow source-to-sink analysis and doesn't recognize a `typeof` branch as
+breaking the taint path from `req.query` to the Mongoose filter. Rather
+than chase the analyzer's exact recognized pattern for one route, applied
+`express-mongo-sanitize` as global Express middleware
+(`server/src/app.js`) — a purpose-built package that strips any request
+key starting with `$` or containing `.` from `req.body`/`req.query`/
+`req.params` before any route handler sees it. This closes the entire
+vulnerability *class* app-wide (every current and future route), not just
+this one query param, and is kept alongside the original `typeof` guard as
+defense-in-depth rather than a replacement for it. Verified live: started
+the real server and confirmed `GET /api/products?category[$ne]=Visible`
+now returns all products (operator key stripped to an empty filter) while
+a real category filter (`?category=Nonexistent`) still correctly returns
+zero results — plus the full test suite and lint still pass.
+
 **CI hardening findings — fixed where safe, deliberately not where unsafe.**
 Sonar flagged four `npm ci` steps (in `ci.yml` and `sonar.yml`, one per
 client/server pair) for omitting `--ignore-scripts` (lets install-time
