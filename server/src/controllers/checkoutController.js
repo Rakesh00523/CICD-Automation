@@ -10,14 +10,21 @@ async function checkout(req, res, next) {
       return res.status(400).json({ message: 'Cart is empty' });
     }
 
-    const orderItems = [];
-    let total = 0;
-
+    // Merge repeated product IDs before validating stock — otherwise the same
+    // product listed twice in one request each get checked against the same
+    // starting stock figure, and both decrements can apply, overselling it.
+    const quantityByProductId = new Map();
     for (const { productId, quantity } of items) {
       if (!mongoose.isValidObjectId(productId) || !Number.isInteger(quantity) || quantity < 1) {
         return res.status(400).json({ message: 'Invalid cart item' });
       }
+      quantityByProductId.set(productId, (quantityByProductId.get(productId) || 0) + quantity);
+    }
 
+    const orderItems = [];
+    let total = 0;
+
+    for (const [productId, quantity] of quantityByProductId) {
       const product = await Product.findById(productId);
       if (!product) {
         return res.status(404).json({ message: `Product ${productId} not found` });
@@ -37,7 +44,7 @@ async function checkout(req, res, next) {
 
     // Decrement stock for each purchased item. This is a mock checkout: no real
     // payment is processed — a fake payment gateway is planned for a later phase.
-    for (const { productId, quantity } of items) {
+    for (const [productId, quantity] of quantityByProductId) {
       await Product.updateOne({ _id: productId }, { $inc: { stock: -quantity } });
     }
 

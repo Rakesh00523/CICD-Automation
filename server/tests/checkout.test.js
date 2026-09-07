@@ -67,4 +67,56 @@ describe('POST /api/checkout', () => {
     const updated = await Product.findById(product._id);
     expect(updated.stock).toBe(3);
   });
+
+  it('rejects a duplicate line item that would oversell stock', async () => {
+    const product = await Product.create({
+      name: 'Duplicated Item',
+      description: 'Requested twice in one cart',
+      price: 15,
+      category: 'Test',
+      imageUrl: 'https://example.com/image.png',
+      stock: 8,
+    });
+
+    // Same product listed twice, 5 units each: 10 units requested, only 8 in stock.
+    const res = await request(app)
+      .post('/api/checkout')
+      .send({
+        items: [
+          { productId: product._id.toString(), quantity: 5 },
+          { productId: product._id.toString(), quantity: 5 },
+        ],
+      });
+
+    expect(res.status).toBe(409);
+
+    const updated = await Product.findById(product._id);
+    expect(updated.stock).toBe(8);
+  });
+
+  it('merges a duplicate line item and decrements stock by the combined quantity', async () => {
+    const product = await Product.create({
+      name: 'Merged Item',
+      description: 'Requested twice in one cart, within stock',
+      price: 15,
+      category: 'Test',
+      imageUrl: 'https://example.com/image.png',
+      stock: 10,
+    });
+
+    const res = await request(app)
+      .post('/api/checkout')
+      .send({
+        items: [
+          { productId: product._id.toString(), quantity: 3 },
+          { productId: product._id.toString(), quantity: 2 },
+        ],
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.total).toBe(75); // 5 units * $15
+
+    const updated = await Product.findById(product._id);
+    expect(updated.stock).toBe(5);
+  });
 });
