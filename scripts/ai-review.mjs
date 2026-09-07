@@ -3,7 +3,7 @@
 // (or updates) a single PR comment with the result.
 //
 // Required env vars: GEMINI_API_KEY, GITHUB_TOKEN, GITHUB_REPOSITORY, PR_NUMBER
-// Optional: GEMINI_MODEL (default: gemini-2.5-flash)
+// Optional: GEMINI_MODEL (default: gemini-3.6-flash)
 
 const COMMENT_MARKER = '<!-- ai-review-bot -->';
 const MAX_DIFF_CHARS = 60000;
@@ -106,7 +106,7 @@ async function main() {
   const githubToken = requireEnv('GITHUB_TOKEN');
   const repo = requireEnv('GITHUB_REPOSITORY');
   const prNumber = requireEnv('PR_NUMBER');
-  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 
   let diff = await fetchDiff(repo, prNumber, githubToken);
   let truncated = false;

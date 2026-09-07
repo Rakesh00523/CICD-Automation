@@ -55,13 +55,23 @@ Claude Pro/Max subscriptions and Anthropic Console API billing are
 separate products: a chat subscription doesn't fund API usage, and the
 Console needs its own prepaid credits. Rather than requiring a purchase
 for a student project, switched the script to Google's Gemini API
-(`gemini-2.5-flash` by default, overridable via `GEMINI_MODEL`), which
-offers a genuinely free tier (no billing setup, rate-limited) via
+(overridable via `GEMINI_MODEL`), which offers a genuinely free tier (no
+billing setup, rate-limited) via
 [Google AI Studio](https://aistudio.google.com/apikey). Confirmed the
-current `generateContent` REST endpoint, request/response shape, and
-`gemini-2.5-flash` model availability directly against Google's docs
-before writing the code, rather than trust knowledge that might be stale.
-Only `scripts/ai-review.mjs` (API call function + env var names) and
+current `generateContent` REST endpoint and request/response shape
+directly against Google's docs before writing the code, rather than trust
+knowledge that might be stale — but still picked a model ID
+(`gemini-2.5-flash`) that Google's docs listed as available yet turned out
+to already be retired for new users by the time the live PR test actually
+ran: `404 ... "This model models/gemini-2.5-flash is no longer available
+to new users. ... use models/gemini-3.6-flash"`. Model availability moves
+fast enough that even a same-day doc check isn't a hard guarantee — a live
+end-to-end test caught what static verification didn't. Fixed by changing
+the default to `gemini-3.6-flash`, the model the API's own error message
+pointed to (`generateContent` itself needed no change — it accepted the
+request and returned a clean structured error, confirming the endpoint
+and request shape were correct; only the model ID was stale). Only
+`scripts/ai-review.mjs` (API call function + env var names) and
 `ai-review.yml` (secret name) needed to change — the diff-fetching,
 comment update-in-place logic, and truncation guard were untouched,
 validating the "own the integration code" decision above. Re-verified the
