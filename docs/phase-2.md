@@ -70,7 +70,15 @@ end-to-end test caught what static verification didn't. Fixed by changing
 the default to `gemini-3.6-flash`, the model the API's own error message
 pointed to (`generateContent` itself needed no change — it accepted the
 request and returned a clean structured error, confirming the endpoint
-and request shape were correct; only the model ID was stale). Only
+and request shape were correct; only the model ID was stale). A third
+live-PR attempt then hit a transient `503 UNAVAILABLE` ("high demand")
+from Gemini — a real, expected-to-happen-sometimes condition, not a bug —
+so added a retry with backoff (2 attempts, 2s/4s) scoped specifically to
+`429`/`503`; anything else (bad model, bad key) still fails immediately
+rather than wasting CI time retrying something retrying won't fix.
+Verified with a stubbed test: a `503`-then-success sequence retries and
+succeeds (confirmed the ~2s backoff actually elapsed), while a `404`
+fails on the first attempt with no delay. Only
 `scripts/ai-review.mjs` (API call function + env var names) and
 `ai-review.yml` (secret name) needed to change — the diff-fetching,
 comment update-in-place logic, and truncation guard were untouched,

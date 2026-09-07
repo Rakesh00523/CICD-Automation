@@ -77,20 +77,35 @@ async function reviewWithGemini(apiKey, model, diff) {
     '```',
   ].join('\n');
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-    {
-      method: 'POST',
-      headers: {
-        'x-goog-api-key': apiKey,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 2000 },
-      }),
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+  const requestInit = {
+    method: 'POST',
+    headers: {
+      'x-goog-api-key': apiKey,
+      'content-type': 'application/json',
     },
-  );
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 2000 },
+    }),
+  };
+
+  // 429/503 are transient (rate limit / momentary overload) — worth a few
+  // retries so a busy moment on Google's side doesn't fail the whole CI run.
+  // Anything else (404 bad model, 401 bad key, etc.) is a real problem that
+  // won't fix itself, so fail immediately instead of wasting time retrying.
+  const RETRYABLE_STATUSES = new Set([429, 503]);
+  const MAX_ATTEMPTS = 3;
+  let res;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    res = await fetch(url, requestInit);
+    if (res.ok || !RETRYABLE_STATUSES.has(res.status) || attempt === MAX_ATTEMPTS) {
+      break;
+    }
+    const delayMs = 2 ** attempt * 1000; // 2s, 4s
+    console.log(`Gemini API returned ${res.status}, retrying in ${delayMs}ms (attempt ${attempt}/${MAX_ATTEMPTS})...`);
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
   if (!res.ok) {
     throw new Error(`Gemini API failed: ${res.status} ${await res.text()}`);
   }
