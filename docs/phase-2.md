@@ -193,11 +193,18 @@ exactly the kind of large, risky change that shouldn't happen as a side
 effect of chasing a CI lint finding, this was **not** applied now. Tracked
 here to be picked up deliberately, likely alongside Phase 4's Trivy work.
 
-**Still open: coverage isn't reaching SonarCloud.** The dashboard shows
-"a few extra steps are needed" despite `sonar.yml` running both
-`test:coverage` scripts and `sonar-project.properties` pointing at both
-`lcov.info` paths. Not yet diagnosed — next thing to check once the
-workflow re-runs against the fixes above.
+**Coverage wasn't reaching SonarCloud — root cause found and fixed.**
+The dashboard showed "a few extra steps are needed" despite `sonar.yml`
+running both `test:coverage` scripts and `sonar-project.properties`
+pointing at both `lcov.info` paths. Inspected the actual generated files:
+Jest/Vitest write `SF:` (source file) entries relative to each package
+(e.g. `SF:src/app.js`, since that's the cwd they ran from), but
+`sonar.sources` is repo-root-relative (`server/src`, `client/src`) — the
+paths never matched, so SonarCloud silently had zero coverage to attach to
+any file. Fixed with a `sed` step in `sonar.yml` that prefixes each
+package's `lcov.info` (`SF:` → `SF:server/` / `SF:client/`) right after the
+coverage tests run, so the paths line up with `sonar.sources` before the
+scan step reads them.
 
 ## Manual setup required (cannot be done by an agent)
 
@@ -235,10 +242,11 @@ appear.
 - [x] Investigated a 3-vulnerability `qs`/Express finding; consciously
       deferred (needs an Express 5 migration) rather than force a risky
       unreviewed major bump
+- [x] Diagnosed and fixed coverage data not reaching SonarCloud (lcov
+      `SF:` paths were package-relative, `sonar.sources` is repo-root-
+      relative — rewritten with `sed` before the scan step)
 - [ ] Real Claude-generated review comment on a live PR (blocked on
       `ANTHROPIC_API_KEY` secret)
-- [ ] Coverage data reaching the SonarCloud dashboard (open, not yet
-      diagnosed)
 
 ## What's next (Phase 3)
 
