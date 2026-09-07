@@ -3,7 +3,10 @@ const Product = require('../models/Product');
 async function listProducts(req, res, next) {
   try {
     const { category } = req.query;
-    const filter = category ? { category } : {};
+    const filter = {};
+    if (typeof category === 'string' && category.trim()) {
+      filter.category = category;
+    }
     const products = await Product.find(filter).sort({ createdAt: -1 });
     res.json(products);
   } catch (err) {

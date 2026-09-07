@@ -122,31 +122,96 @@ fixed here rather than left for later:
   setup only the repo owner can do (see below) — this is the honest state,
   not a completed one, until that setup happens and a real PR is opened.
 
+## SonarCloud went live — what it actually found
+
+The repo owner completed the SonarCloud signup, imported the project
+(`Rakesh00523_CICD-Automation` under org `rakesh00523`, both matching the
+guessed defaults in `sonar-project.properties`), and added `SONAR_TOKEN`.
+The very first real analysis surfaced genuine, actionable findings rather
+than noise:
+
+**A BLOCKER-severity SQL/NoSQL injection (fixed).**
+`server/src/controllers/productController.js` built a Mongoose filter
+directly from `req.query.category`:
+`const filter = category ? { category } : {};`. Express's default query
+parser (`qs`) turns `?category[$ne]=null` into
+`{ category: { $ne: null } }` — an object, not a string — which Mongoose
+then executes as a real MongoDB query operator instead of a literal value
+match. Fixed by requiring `category` to actually be a string before using
+it:
+```js
+const filter = {};
+if (typeof category === 'string' && category.trim()) {
+  filter.category = category;
+}
+```
+Added a regression test (`server/tests/products.test.js`) that seeds two
+products in different categories and requests
+`?category[$ne]=Visible`: on the vulnerable code this returns only the
+"Hidden" product (the `$ne` operator actually executes), on the fixed code
+it returns both (the operator object is rejected and the filter is
+dropped). **Verified the test has real teeth** — temporarily reverted the
+fix and confirmed the test fails with exactly the predicted vulnerable
+behavior, then restored the fix and confirmed it passes again.
+
+**CI hardening findings — fixed where safe, deliberately not where unsafe.**
+Sonar flagged four `npm ci` steps (in `ci.yml` and `sonar.yml`, one per
+client/server pair) for omitting `--ignore-scripts` (lets install-time
+lifecycle scripts run arbitrary code) and one action reference
+(`SonarSource/sonarqube-scan-action@v4`) for not being pinned to a full
+commit SHA.
+- **Action pinned to a full SHA** — and in the process discovered `@v4` was
+  several major versions stale (current is v8); this was almost certainly
+  the actual cause of the SonarCloud Scan CI *step* reporting failure even
+  though the *analysis itself* successfully reached the SonarCloud
+  dashboard (its own "Quality Gate not computed" check reported `neutral`,
+  not `failure` — the two disagreeing was the tell). Upgraded to
+  `@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1`, verified the
+  env-var-based `SONAR_TOKEN`/`GITHUB_TOKEN` interface is unchanged in v8.
+- **`--ignore-scripts` added to both client `npm ci` steps** — verified
+  safe first: ran `npm ci --ignore-scripts` + full build + test in an
+  isolated copy, all clean (modern esbuild ships prebuilt platform
+  binaries via `optionalDependencies`, not a postinstall script).
+- **`--ignore-scripts` deliberately NOT added to either server `npm ci`
+  step** — tested it the same way first, and it broke every test:
+  `mongodb-memory-server`'s install script is what fetches the MongoDB
+  binary the test suite connects to; skipping it makes every test time out
+  trying to reach a database that was never downloaded. Left as plain
+  `npm ci` with a comment explaining why, rather than silently ignoring the
+  finding or blindly applying it and breaking CI.
+
+**A vulnerability found, investigated, and consciously deferred.**
+`npm audit` on `server/` found 3 moderate vulnerabilities in `qs` (via
+`body-parser`/`express`) — a DoS and an array-limit bypass. Unlike the
+client-side vite/vitest case in Phase 2's earlier work, `npm audit fix`
+(no `--force`) was a genuine no-op here: `qs@6.15.3` is already the newest
+version `express@4.x`'s `body-parser` will accept: the real fix needs
+Express 5, a major version with real breaking-change surface (async error
+handling, route-matching behavior). Given the severity is moderate (not
+blocker/critical) and an unreviewed Express major-version migration is
+exactly the kind of large, risky change that shouldn't happen as a side
+effect of chasing a CI lint finding, this was **not** applied now. Tracked
+here to be picked up deliberately, likely alongside Phase 4's Trivy work.
+
+**Still open: coverage isn't reaching SonarCloud.** The dashboard shows
+"a few extra steps are needed" despite `sonar.yml` running both
+`test:coverage` scripts and `sonar-project.properties` pointing at both
+`lcov.info` paths. Not yet diagnosed — next thing to check once the
+workflow re-runs against the fixes above.
+
 ## Manual setup required (cannot be done by an agent)
 
-Two external accounts/secrets need to be configured by the repo owner:
+One external secret is still outstanding:
 
-1. **SonarCloud**
-   - Sign in at [sonarcloud.io](https://sonarcloud.io) with the GitHub
-     account, import `Rakesh00523/CICD-Automation` as a new project.
-   - Confirm the generated **Organization Key** and **Project Key** match
-     `sonar.organization` / `sonar.projectKey` in `sonar-project.properties`
-     — SonarCloud sometimes appends a suffix; adjust the file if so. (A
-     `.vscode/settings.json` with SonarLint connected-mode config appeared
-     during this phase pointing at `rakesh00523` /
-     `Rakesh00523_CICD-Automation`, matching what's in
-     `sonar-project.properties` — good sign these guessed defaults are
-     actually correct.)
-   - Generate a token (My Account → Security) and add it as a GitHub Actions
-     secret named `SONAR_TOKEN` (repo Settings → Secrets and variables →
-     Actions).
-2. **Anthropic API key**
+1. ~~SonarCloud~~ — **done.** Project imported, `SONAR_TOKEN` added, real
+   analysis running (see above).
+2. **Anthropic API key** — still needed:
    - Create an API key at [console.anthropic.com](https://console.anthropic.com).
-   - Add it as a GitHub Actions secret named `ANTHROPIC_API_KEY`.
+   - Add it as a GitHub Actions secret named `ANTHROPIC_API_KEY` (repo
+     Settings → Secrets and variables → Actions).
 
-Once both secrets exist, open any PR against `main` — both workflows will
-run automatically, and their results (SonarCloud check + AI review comment)
-should be visible directly on the PR.
+Once that's added, open any PR against `main` to see the AI review comment
+appear.
 
 ## Tasks accomplished
 
@@ -159,9 +224,21 @@ should be visible directly on the PR.
 - [x] Verified the major dependency bump didn't break the app — real
       browser walkthrough of the full golden path, zero console errors
 - [x] Control-flow of the AI review script verified against a stubbed API
-- [ ] Real SonarCloud scan on a live PR (blocked on manual account setup)
-- [ ] Real Claude-generated review comment on a live PR (blocked on manual
-      secret setup)
+- [x] SonarCloud project imported, token configured, real analysis running
+- [x] Fixed a real BLOCKER-severity NoSQL injection SonarCloud found, with
+      a regression test verified against both the vulnerable and fixed code
+- [x] Fixed 2 of 5 CI-hardening findings (`--ignore-scripts` on client
+      installs); the other 3 (server installs, and the vite/vitest peer
+      warning noted earlier) deliberately left with documented rationale
+- [x] Pinned the SonarCloud scan action to a full commit SHA and updated
+      it off a 4-major-version-stale tag
+- [x] Investigated a 3-vulnerability `qs`/Express finding; consciously
+      deferred (needs an Express 5 migration) rather than force a risky
+      unreviewed major bump
+- [ ] Real Claude-generated review comment on a live PR (blocked on
+      `ANTHROPIC_API_KEY` secret)
+- [ ] Coverage data reaching the SonarCloud dashboard (open, not yet
+      diagnosed)
 
 ## What's next (Phase 3)
 

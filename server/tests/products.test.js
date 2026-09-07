@@ -45,6 +45,34 @@ describe('GET /api/products', () => {
     expect(res.body).toHaveLength(1);
     expect(res.body[0].name).toBe('Test Product');
   });
+
+  it('does not treat a query-operator object as a Mongo query operator', async () => {
+    await Product.create({
+      name: 'Hidden Product',
+      description: 'Category: Hidden',
+      price: 5,
+      category: 'Hidden',
+      imageUrl: 'https://example.com/image.png',
+      stock: 1,
+    });
+    await Product.create({
+      name: 'Visible Product',
+      description: 'Category: Visible',
+      price: 5,
+      category: 'Visible',
+      imageUrl: 'https://example.com/image.png',
+      stock: 1,
+    });
+
+    // Express parses category[$ne]=Visible into { category: { $ne: 'Visible' } }.
+    // If that object reached Mongoose as-is, it would run as an operator query
+    // and return only the "Hidden" product (category != 'Visible'). Since
+    // `category` isn't a string, the filter must be dropped instead, so both
+    // products come back.
+    const res = await request(app).get('/api/products?category[$ne]=Visible');
+    expect(res.status).toBe(200);
+    expect(res.body.map((p) => p.name).sort()).toEqual(['Hidden Product', 'Visible Product']);
+  });
 });
 
 describe('GET /api/products/:id', () => {
