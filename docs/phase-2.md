@@ -262,19 +262,38 @@ scan step reads them.
 
 ## Manual setup required (cannot be done by an agent)
 
+Both done — nothing outstanding:
+
 1. ~~SonarCloud~~ — **done.** Project imported, set to CI-based analysis,
    `SONAR_TOKEN` added, both `CI` and `SonarCloud` workflows confirmed
    green on GitHub Actions.
-2. **Gemini API key** (replaces the Anthropic key — see the provider
-   switch above):
-   - Create a free key at [Google AI Studio](https://aistudio.google.com/apikey)
-     (no billing setup required for the free tier).
-   - Add it as a GitHub Actions secret named `GEMINI_API_KEY` (repo
-     Settings → Secrets and variables → Actions) — remove the old
-     `ANTHROPIC_API_KEY` secret if it's still there, it's unused now.
+2. ~~Gemini API key~~ — **done.** `GEMINI_API_KEY` added (remove the old
+   unused `ANTHROPIC_API_KEY` secret whenever convenient).
 
-Once that's added, open any PR against `main` to see the AI review comment
-appear.
+## Live PR verification (PR #1, `fix/checkout-duplicate-line-items`)
+
+Opened a real PR (fixing a genuine bug found while preparing this test —
+duplicate cart line items could oversell stock, see the server fix commits)
+specifically to verify both review layers end-to-end, not just in isolation.
+Both posted real, substantive results — not boilerplate:
+
+- **Gemini AI review**: flagged a legitimate, separate concern — the
+  checkout logic's stock check and decrement aren't atomic, a race
+  condition risk under concurrent requests that could still oversell stock
+  even with the duplicate-line-item bug fixed. Correct and useful; not
+  addressed in this PR (out of scope for the pipeline-verification goal),
+  tracked here for a future pass — likely alongside whatever concurrency
+  handling Phase 5's deployment work needs anyway.
+- **SonarCloud**: Quality Gate passed — 100% coverage on new code, 0
+  duplication, 0 new issues. Confirms both the lcov-path fix and the
+  CI-analysis-mode fix are actually working, not just theoretically
+  correct.
+
+Getting here took three live-PR iterations, each a genuine external
+failure rather than a code bug: an Anthropic billing gate (provider
+switch to Gemini), a retired Gemini model ID (`gemini-2.5-flash` →
+`gemini-3.6-flash`), and a transient `503` from Gemini (added retry/
+backoff). All documented above as they happened.
 
 ## Tasks accomplished
 
@@ -310,8 +329,13 @@ appear.
       switched the provider to Gemini (free tier) rather than require a
       purchase — verified the new control flow against a stubbed API,
       including Gemini's safety-filter-block edge case
-- [ ] Real Gemini-generated review comment on a live PR (blocked on
-      `GEMINI_API_KEY` secret)
+- [x] Diagnosed and fixed a retired Gemini model ID (404) and added
+      retry/backoff for transient `503`s, both found via live PR testing
+      rather than static verification
+- [x] Real Gemini-generated review comment confirmed on a live PR (PR #1)
+      — correctly flagged a genuine, separate race-condition concern
+- [x] Real SonarCloud Quality Gate confirmed passing on a live PR — 100%
+      new-code coverage, 0 duplication, 0 new issues
 
 ## What's next (Phase 3)
 
