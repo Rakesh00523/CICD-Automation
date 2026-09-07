@@ -193,6 +193,19 @@ exactly the kind of large, risky change that shouldn't happen as a side
 effect of chasing a CI lint finding, this was **not** applied now. Tracked
 here to be picked up deliberately, likely alongside Phase 4's Trivy work.
 
+**The `sonarcloud` CI job kept failing despite successful analyses — root
+cause found and fixed.** Even after pinning/upgrading the scan action, the
+GitHub Actions job still failed while SonarCloud's own check reported
+`success`/"Quality Gate passed" — a direct contradiction. Cause: SonarCloud
+defaults newly-imported projects to **Automatic Analysis** (it scans commits
+server-side on its own), which actively conflicts with a CI-triggered scan
+— SonarCloud accepts the CI analysis but the scanner step still exits with
+an error because two analysis methods are active at once. Fixed by
+switching the project's Analysis Method to CI-based (GitHub Actions) in
+SonarCloud's project Administration settings, and rotating `SONAR_TOKEN`.
+Verified with a fresh push: **both `CI` and `SonarCloud` workflows
+completed with conclusion `success`.**
+
 **Coverage wasn't reaching SonarCloud — root cause found and fixed.**
 The dashboard showed "a few extra steps are needed" despite `sonar.yml`
 running both `test:coverage` scripts and `sonar-project.properties`
@@ -210,8 +223,9 @@ scan step reads them.
 
 One external secret is still outstanding:
 
-1. ~~SonarCloud~~ — **done.** Project imported, `SONAR_TOKEN` added, real
-   analysis running (see above).
+1. ~~SonarCloud~~ — **done.** Project imported, set to CI-based analysis,
+   `SONAR_TOKEN` added, both `CI` and `SonarCloud` workflows confirmed
+   green on GitHub Actions.
 2. **Anthropic API key** — still needed:
    - Create an API key at [console.anthropic.com](https://console.anthropic.com).
    - Add it as a GitHub Actions secret named `ANTHROPIC_API_KEY` (repo
@@ -245,6 +259,10 @@ appear.
 - [x] Diagnosed and fixed coverage data not reaching SonarCloud (lcov
       `SF:` paths were package-relative, `sonar.sources` is repo-root-
       relative — rewritten with `sed` before the scan step)
+- [x] Diagnosed and fixed the `sonarcloud` CI job failing despite
+      successful analyses (Automatic Analysis vs. CI-analysis conflict) —
+      switched SonarCloud project to CI-based analysis, rotated the token,
+      verified both `CI` and `SonarCloud` workflows green on a fresh push
 - [ ] Real Claude-generated review comment on a live PR (blocked on
       `ANTHROPIC_API_KEY` secret)
 
