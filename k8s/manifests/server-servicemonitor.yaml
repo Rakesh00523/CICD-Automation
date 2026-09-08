@@ -1,0 +1,22 @@
+# Tells the kube-prometheus-stack Prometheus (deployed by the separate
+# `monitoring` ArgoCD Application, see k8s/monitoring/) to scrape this
+# app's /metrics endpoint. Lives alongside the app it monitors rather than
+# under k8s/monitoring/, since it's app-specific, not stack-specific;
+# Prometheus's serviceMonitorSelector is set to {} (select all
+# namespaces), so this is discovered regardless of which Application
+# manages it.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: server
+  namespace: shoppipe
+  labels:
+    app: server
+spec:
+  selector:
+    matchLabels:
+      app: server
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

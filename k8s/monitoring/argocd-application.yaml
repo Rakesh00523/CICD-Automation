@@ -1,0 +1,81 @@
+# GitOps-managed monitoring stack -- kube-prometheus-stack (Prometheus
+# Operator + Prometheus + Grafana + kube-state-metrics + node-exporter),
+# deployed by ArgoCD from the Helm repo directly, same as any other
+# Application in this project. Apply once manually, same as
+# k8s/argocd-application.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 90.0.0
+    helm:
+      valuesObject:
+        # Alertmanager isn't needed for this project's scope (no on-call
+        # routing to configure) -- one less component to run and verify.
+        alertmanager:
+          enabled: false
+        prometheus:
+          prometheusSpec:
+            retention: 1d # this is a demo cluster, not production
+            resources:
+              requests: { cpu: 100m, memory: 256Mi }
+              limits: { cpu: 500m, memory: 512Mi }
+            # Let Prometheus discover ServiceMonitors from any namespace
+            # (not just its own release namespace) -- the app's
+            # ServiceMonitor lives in the shoppipe namespace.
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+        grafana:
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            # Grafana 13's newer "app platform" architecture registers a
+            # large number of internal API groups at boot (alerting,
+            # advisor, shorturl, notifications, ...) plus a first-boot
+            # SQLite migration -- observed directly, across several
+            # attempts, that this genuinely took several minutes on this
+            # machine regardless of CPU limit (200m vs 1000m made no
+            # measurable difference), so the real fix is probe budget
+            # below, not more CPU -- but left some extra headroom anyway.
+            limits: { cpu: 1000m, memory: 256Mi }
+          livenessProbe:
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 40 # 60s + 40*15s = 11 minutes of startup budget
+            timeoutSeconds: 30
+          readinessProbe:
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 40
+        kube-state-metrics:
+          resources:
+            requests: { cpu: 25m, memory: 64Mi }
+            limits: { cpu: 100m, memory: 128Mi }
+        prometheus-node-exporter:
+          resources:
+            requests: { cpu: 25m, memory: 32Mi }
+            limits: { cpu: 100m, memory: 64Mi }
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # kube-prometheus-stack ships large CRDs (Prometheus, Alertmanager,
+      # ServiceMonitor, PrometheusRule, ...) -- client-side apply already
+      # broke on ArgoCD's own CRDs in Phase 5 for exactly this reason.
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 3m
