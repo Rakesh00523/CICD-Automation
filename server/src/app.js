@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const mongoSanitize = require('express-mongo-sanitize');
+const { register, metricsMiddleware } = require('./metrics');
 const productsRouter = require('./routes/products');
 const checkoutRouter = require('./routes/checkout');
 
@@ -17,8 +18,13 @@ function createApp() {
   if (process.env.NODE_ENV !== 'test') {
     app.use(morgan('dev'));
   }
+  app.use(metricsMiddleware);
 
   app.get('/health', (req, res) => res.json({ status: 'ok' }));
+  app.get('/metrics', async (req, res) => {
+    res.set('Content-Type', register.contentType);
+    res.end(await register.metrics());
+  });
   app.use('/api/products', productsRouter);
   app.use('/api/checkout', checkoutRouter);
 
