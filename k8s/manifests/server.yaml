@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: server
+  namespace: shoppipe
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: server
+  template:
+    metadata:
+      labels:
+        app: server
+    spec:
+      containers:
+        - name: server
+          # Pinned to the exact digest Phase 4 scanned, signed, and
+          # published — not a mutable :latest tag. This is provably the
+          # same artifact that passed the Trivy gate and carries a
+          # verified Cosign signature, not just "whatever :latest is now".
+          image: ghcr.io/rakesh00523/cicd-automation/server@sha256:03525d566893542e4c596d76d5f1a1a58222c01d412c4a81f1e2a54b25cf4d3e
+          ports:
+            - containerPort: 5000
+          env:
+            - name: PORT
+              value: "5000"
+            - name: MONGODB_URI
+              value: mongodb://mongo:27017/ecommerce
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: server
+  namespace: shoppipe
+spec:
+  selector:
+    app: server
+  ports:
+    - port: 5000
+      targetPort: 5000

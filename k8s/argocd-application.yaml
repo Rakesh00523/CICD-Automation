@@ -1,0 +1,24 @@
+# Bootstrap resource -- apply this once manually (`kubectl apply -f`)
+# after ArgoCD itself is installed. Everything under k8s/manifests/ is
+# then GitOps-managed: ArgoCD watches this repo and reconciles the live
+# cluster to match whatever's committed there, automatically.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: shoppipe
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Rakesh00523/CICD-Automation.git
+    targetRevision: main
+    path: k8s/manifests
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: shoppipe
+  syncPolicy:
+    automated:
+      prune: true # remove resources that are deleted from Git
+      selfHeal: true # revert manual cluster changes that drift from Git
+    syncOptions:
+      - CreateNamespace=true

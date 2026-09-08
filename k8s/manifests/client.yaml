@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: client
+  namespace: shoppipe
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: client
+  template:
+    metadata:
+      labels:
+        app: client
+    spec:
+      containers:
+        - name: client
+          # Pinned to the exact digest Phase 4 scanned, signed, and
+          # published (see server.yaml for the full rationale). Built with
+          # VITE_API_BASE_URL=http://localhost:5000/api baked in, so the
+          # server must be reachable at localhost:5000 from the browser --
+          # see docs/phase-5.md for the kubectl port-forward mapping that
+          # makes that true against this cluster.
+          image: ghcr.io/rakesh00523/cicd-automation/client@sha256:f591024ab63cf98d6ef16c54ef25f9efb581ca36f38b1d0c32c90103520d047c
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: client
+  namespace: shoppipe
+spec:
+  selector:
+    app: client
+  ports:
+    - port: 8080
+      targetPort: 8080
