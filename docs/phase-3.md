@@ -58,13 +58,39 @@ work, not just that they parse.
 - `docker/build-push-action@v7.3.0`'s input interface (`context`, `push`,
   `tags`, `cache-from`, `cache-to`) confirmed unchanged from v6 directly
   against the action's `action.yml`, since it was a major-version jump.
-- **Not yet verified**: actually building or running any of these images.
-  Docker Desktop isn't installed on this machine yet (needs WSL2, which
-  needs a reboot to install) — this is the honest state, matching how
-  Phase 1 was written before Node.js existed on the machine. Once Docker
-  is available: build both images, run `docker compose up`, and repeat
-  the Playwright golden-path walkthrough from Phase 2 against the
-  containerized app instead of the local dev servers.
+- `docker-build.yml` confirmed **green on GitHub Actions** — both images
+  build successfully on GitHub's runners (which have Docker preinstalled),
+  even before Docker existed on the dev machine.
+
+## Docker Desktop installed — full local verification
+
+Once Docker Desktop (with the WSL2 backend) was installed and running:
+
+- `docker compose build`: both images built clean.
+- `docker compose up -d`: all three services (`mongo`, `server`, `client`)
+  came up and reported **`healthy`** on their Docker healthchecks —
+  including `server` correctly waiting on Mongo's healthcheck via
+  `depends_on: condition: service_healthy` before starting.
+- Seeded the containerized database (`docker compose exec server node
+  src/seed/seedProducts.js`), then hit `GET /health` and
+  `GET /api/products` over HTTP against the containerized server — real
+  data, correct responses.
+- **Full Playwright golden-path walkthrough repeated against the
+  containerized stack** (not the local dev servers): product list →
+  product detail → add to cart → cart → checkout → order confirmation,
+  against `http://localhost:5173` (nginx serving the Vite production
+  build) talking to the containerized server and MongoDB. Zero browser
+  console errors. Screenshots confirmed real product data and a correct
+  order confirmation (`Total: $34.25`). This specifically exercised the
+  nginx SPA-fallback config (`try_files ... /index.html`) — client-side
+  route navigation worked, proving that config is actually correct and
+  not just plausible-looking.
+- Confirmed the server container actually runs as the non-root `app`
+  user (`docker compose exec server whoami` → `app`), not root.
+- Image sizes: `cicdautomation-client` 73.9MB, `cicdautomation-server`
+  217MB — both Alpine-based as intended.
+- Reseeded the database back to a clean state after the smoke-test
+  purchase decremented stock.
 
 ## Tasks accomplished
 
@@ -73,11 +99,34 @@ work, not just that they parse.
 - [x] `docker-compose.yml` for local 3-service development
 - [x] CI job to build both images on push/PR
 - [x] New CI actions pinned to a checked (not guessed) current commit SHA
-- [ ] Docker Desktop installed on the dev machine (blocked on a WSL2
-      install + reboot the user needs to do manually)
-- [ ] Images actually built and run locally
-- [ ] Full app walkthrough verified against the containerized version
-- [ ] `docker-build.yml` confirmed green on GitHub Actions
+- [x] `docker-build.yml` confirmed green on GitHub Actions
+- [x] Docker Desktop installed on the dev machine (WSL2 backend)
+- [x] Both images built and the full stack run locally via
+      `docker compose up` — all three services healthy
+- [x] Full Playwright walkthrough verified against the containerized app,
+      zero console errors, including the nginx SPA-routing fallback
+- [x] Non-root server user confirmed at runtime, not just in the Dockerfile
+
+## How to run with Docker
+
+Alternative to the manual `npm install` setup in
+[docs/phase-1.md](phase-1.md) — no local Node.js or MongoDB install needed,
+just Docker Desktop.
+
+```powershell
+docker compose up -d --build      # builds (first run) and starts all 3 services
+docker compose exec server node src/seed/seedProducts.js   # populate sample products
+```
+
+- App: http://localhost:5173
+- API: http://localhost:5000/api/products
+- MongoDB: exposed on `localhost:27017` if you want to connect with Compass
+
+```powershell
+docker compose ps                 # check status/health of all services
+docker compose logs -f server     # tail a service's logs
+docker compose down               # stop everything (add -v to also wipe the mongo volume)
+```
 
 ## What's next (Phase 4)
 

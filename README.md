@@ -20,7 +20,7 @@ docker-compose.yml  Local multi-service dev: mongo + server + client
 |---|-------|--------|-----|
 | 1 | Foundation (app + basic CI) | Complete | [docs/phase-1.md](docs/phase-1.md) |
 | 2 | Code Quality + AI Review (SonarCloud + Gemini API) | Complete — both verified on a live PR | [docs/phase-2.md](docs/phase-2.md) |
-| 3 | Containerization (Docker) | Code complete, pending Docker install for verification | [docs/phase-3.md](docs/phase-3.md) |
+| 3 | Containerization (Docker) | Complete — verified locally + in CI | [docs/phase-3.md](docs/phase-3.md) |
 | 4 | Supply Chain Security (Trivy, Syft, Cosign) | Not started | — |
 | 5 | GitOps Deployment (Minikube + ArgoCD) | Not started | — |
 | 6 | Observability (Prometheus + Grafana) | Not started | — |
