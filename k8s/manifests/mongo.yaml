@@ -35,15 +35,22 @@ spec:
             - name: data
               mountPath: /data/db
           readinessProbe:
-            exec:
-              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
-            initialDelaySeconds: 5
-            periodSeconds: 10
-          livenessProbe:
+            # mongosh is a Node.js-based CLI with real startup overhead --
+            # the default 1s probe timeout kills an otherwise-healthy mongod
+            # before mongosh even finishes launching (verified: this was
+            # causing a genuine crash loop, not a resource problem).
             exec:
               command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
             initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+            initialDelaySeconds: 20
             periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 3
           resources:
             requests:
               cpu: 100m
