@@ -12,6 +12,7 @@ server/             Node/Express + MongoDB API: products, checkout
 docs/               One markdown document per project phase
 .github/            CI/CD workflow definitions
 docker-compose.yml  Local multi-service dev: mongo + server + client
+k8s/                Kubernetes manifests + ArgoCD Application (GitOps deployment)
 ```
 
 ## Phases
@@ -22,7 +23,7 @@ docker-compose.yml  Local multi-service dev: mongo + server + client
 | 2 | Code Quality + AI Review (SonarCloud + Gemini API) | Complete — both verified on a live PR | [docs/phase-2.md](docs/phase-2.md) |
 | 3 | Containerization (Docker) | Complete — verified locally + in CI | [docs/phase-3.md](docs/phase-3.md) |
 | 4 | Supply Chain Security (Trivy, Syft, Cosign) | Complete — images signed and live in GHCR | [docs/phase-4.md](docs/phase-4.md) |
-| 5 | GitOps Deployment (Minikube + ArgoCD) | Not started | — |
+| 5 | GitOps Deployment (Minikube + ArgoCD) | Complete — deployed, self-heal verified | [docs/phase-5.md](docs/phase-5.md) |
 | 6 | Observability (Prometheus + Grafana) | Not started | — |
 | 7 | Feature Expansion + Full Pipeline Demo (auth, fake payment) | Not started | — |
 | 8 | Final Report | Not started | — |

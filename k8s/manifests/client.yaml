@@ -13,6 +13,9 @@ spec:
       labels:
         app: client
     spec:
+      # This pod never talks to the Kubernetes API, so it doesn't need a
+      # token for it mounted into the container.
+      automountServiceAccountToken: false
       containers:
         - name: client
           # Pinned to the exact digest Phase 4 scanned, signed, and
@@ -40,9 +43,11 @@ spec:
             requests:
               cpu: 25m
               memory: 32Mi
+              ephemeral-storage: 64Mi
             limits:
               cpu: 100m
               memory: 64Mi
+              ephemeral-storage: 128Mi
 ---
 apiVersion: v1
 kind: Service
