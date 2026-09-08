@@ -61,6 +61,13 @@ kind: Service
 metadata:
   name: server
   namespace: shoppipe
+  # ServiceMonitor's selector matches the Service's own metadata.labels --
+  # a completely different field from spec.selector below (which picks
+  # which pods this Service routes to). Missing this label was why the
+  # ServiceMonitor discovered this Service as an SD candidate but then
+  # dropped it, right alongside client/mongo, instead of scraping it.
+  labels:
+    app: server
 spec:
   selector:
     app: server

@@ -41,18 +41,27 @@ spec:
             # mongosh is a Node.js-based CLI with real startup overhead --
             # the default 1s probe timeout kills an otherwise-healthy mongod
             # before mongosh even finishes launching (verified: this was
-            # causing a genuine crash loop, not a resource problem).
+            # causing a genuine crash loop, not a resource problem). A
+            # readiness failure only pulls the pod out of the Service's
+            # endpoints -- non-destructive -- so it's the safe place for
+            # the more expensive, more thorough check.
             exec:
               command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
             initialDelaySeconds: 10
             periodSeconds: 10
-            timeoutSeconds: 10
+            timeoutSeconds: 15
+          # Liveness uses a cheap TCP check instead of exec'ing mongosh.
+          # Under real system load (observed directly, several times) even
+          # a generous exec timeout could itself time out -- creating a
+          # spiral where an expensive probe gets starved, kills an
+          # otherwise-healthy mongod, and the resulting restart adds more
+          # load. A liveness probe should answer "is the process alive",
+          # not "is it fully healthy" -- readiness above already covers that.
           livenessProbe:
-            exec:
-              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+            tcpSocket:
+              port: 27017
             initialDelaySeconds: 20
             periodSeconds: 20
-            timeoutSeconds: 10
             failureThreshold: 3
           resources:
             requests:
