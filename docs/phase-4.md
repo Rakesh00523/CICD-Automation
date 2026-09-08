@@ -130,6 +130,35 @@ since removing files under `/usr/local` needs root. Rebuilt and rescanned:
   locally against `cicdautomation-server:latest`: **exit code 0** — the
   gate would pass.
 
+## Confirmed live on GitHub — the whole pipeline, not just the gate
+
+Pushed and watched all four workflows (`CI`, `SonarCloud`, `Docker Build`,
+`Docker Publish`) run: **all four green on the first attempt**, no
+surprises — the local verification above actually predicted CI behavior
+correctly this time (unlike earlier phases' first attempts). Then verified
+the published artifacts directly, not just the workflow's own conclusion:
+
+- **Both images pull publicly from GHCR** with no authentication:
+  `docker pull ghcr.io/rakesh00523/cicd-automation/server:latest` and
+  `.../client:latest` both succeeded from a clean local Docker.
+- **Cosign signature verified independently**, using cosign's own
+  container image (not trusting the workflow's self-report):
+  ```
+  cosign verify \
+    --certificate-identity-regexp "https://github.com/Rakesh00523/CICD-Automation/.github/workflows/docker-publish.yml.*" \
+    --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+    ghcr.io/rakesh00523/cicd-automation/server@sha256:03525d5...
+  ```
+  All three checks passed: cosign claims validated, the transparency-log
+  (Rekor) entry verified offline, and the code-signing certificate
+  verified against trusted CAs — and the signer identity matched this
+  exact workflow file, not just "some GitHub Action."
+- **Both SBOMs generated with real content**, confirmed via the workflow
+  run's artifacts (not just that the step didn't error):
+  `sbom-server.spdx.json` (40.7 KB) and `sbom-client.spdx.json`
+  (137 KB) — sizes consistent with an actual dependency-tree SPDX
+  document, not an empty/stub file.
+
 ## Tasks accomplished
 
 - [x] `docker-build.yml` extended with Trivy scanning (SARIF report +
@@ -148,10 +177,14 @@ since removing files under `/usr/local` needs root. Rebuilt and rescanned:
 - [x] Extended `--ignore-scripts` to both Dockerfiles' `npm ci` calls
 - [x] Full local re-verification after every fix: rebuild, healthy stack,
       non-root confirmed, full golden-path walkthrough, Trivy rescan
-- [ ] `docker-build.yml` and `docker-publish.yml` confirmed green on
-      GitHub Actions (pushed, not yet observed)
-- [ ] Image actually visible in GHCR, signed, with an attached SBOM
-      (depends on the above)
+- [x] `docker-build.yml` and `docker-publish.yml` confirmed green on
+      GitHub Actions — all four workflows (`CI`, `SonarCloud`, `Docker
+      Build`, `Docker Publish`) passed on the first push
+- [x] Both images confirmed publicly pullable from GHCR
+- [x] Cosign signature independently verified (not just "the step
+      succeeded") — claims, transparency log, and certificate identity
+      all checked out against this exact workflow
+- [x] Both SBOMs confirmed generated with substantial real content
 
 ## What's next (Phase 5)
 
