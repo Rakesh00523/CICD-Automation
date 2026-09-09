@@ -46,12 +46,17 @@ spec:
           livenessProbe:
             initialDelaySeconds: 60
             periodSeconds: 15
-            failureThreshold: 40 # 60s + 40*15s = 11 minutes of startup budget
+            # 11 minutes (failureThreshold: 40) still wasn't enough --
+            # observed directly, restarts kept happening mid-way through
+            # Grafana's built-in datasource-plugin registration phase
+            # (dozens of bundled plugins loaded sequentially at boot).
+            # Bumped further rather than guess again.
+            failureThreshold: 100 # 60s + 100*15s = ~26 minutes of startup budget
             timeoutSeconds: 30
           readinessProbe:
             initialDelaySeconds: 30
             periodSeconds: 15
-            failureThreshold: 40
+            failureThreshold: 100
         kube-state-metrics:
           resources:
             requests: { cpu: 25m, memory: 64Mi }
