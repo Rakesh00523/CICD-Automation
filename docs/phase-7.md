@@ -130,23 +130,49 @@ directory, an explicit include/exclude on the source), not a comment.
   token, 400 with no payment block, 402 on a decline card with stock and
   order count unchanged, and a new assertion that the confirmed order's
   `user` and `payment.cardLast4` are populated correctly.
-- Client: `Login.test.jsx` (form renders), `ProtectedRoute.test.jsx`
-  (redirects to `/login` when logged out, renders protected content when
-  a token is present in `localStorage`) — same
-  `@testing-library/react` pattern as the existing `ProductCard.test.jsx`.
+- Client: `Login.test.jsx`, `Register.test.jsx` (success redirects,
+  server error surfaced), `OrderHistory.test.jsx` (empty/populated/error
+  states), `Navbar.test.jsx` (logged-out vs logged-in rendering, logout
+  clears storage), `Checkout.test.jsx` (empty cart, successful payment +
+  confirmation, 402 decline surfaced), `ProtectedRoute.test.jsx`
+  (redirects when logged out, renders through when a token is present),
+  `api.test.js` (every wrapper function, plus the auth interceptor's
+  token-attach/absent/corrupt-storage branches, by spying on the axios
+  instance directly) — same `@testing-library/react` pattern as the
+  existing `ProductCard.test.jsx`.
 
 ## Verification performed
 
 - `npm test` and `npm run lint` green in both `server/` (28 tests, 5
-  suites) and `client/` (4 tests, 3 suites); `npm run build` in `client/`
-  succeeds.
-- Not yet done: building/scanning/signing/publishing the Phase 7 images
-  through the existing Phase 4 pipeline, bumping the digests in
-  `k8s/manifests/*.yaml`, and re-verifying the live Minikube/ArgoCD
-  cluster stays `Synced`/`Healthy` end-to-end against the new feature —
-  this is the natural next step once this code is pushed and the pipeline
-  runs, matching how Phases 3–6 each landed code first and confirmed live
-  deployment in a following commit.
+  suites) and `client/` (27 tests, 8 suites); `npm run build` in
+  `client/` succeeds.
+- **Pipeline, end to end on real pushes**: CI, Docker Build, Docker
+  Publish, and SonarCloud all green on the final commit. Two genuine
+  issues turned up and were fixed with substance, not suppressed:
+  - SonarCloud's quality gate failed for real reasons on the first pass:
+    `Math.random()` building the fake gateway's `transactionId`, flagged
+    as an insecure PRNG for a security-sensitive value
+    (`javascript:S2245`) — fixed with `crypto.randomUUID()`. And
+    `new_coverage` at 72.5% against an 80% gate, because several new
+    client files (`api.js`, `AuthContext.jsx`, the new pages, `Navbar.jsx`,
+    `ProtectedRoute.jsx`) had no test at all touching them — not partial
+    coverage, absent from the lcov report entirely. Closed with the real
+    tests listed above, not filler: client coverage went from 51.89% to
+    90.16% statements, and the gate's `new_coverage` metric hit 95.0%.
+  - A SonarCloud scanner run failed with an `Error 500` from SonarCloud's
+    own API mid-scan — transient, resolved by re-running the job; not a
+    code issue.
+- **Live redeploy against the Minikube/ArgoCD cluster from Phases 5/6**,
+  after cosign-verifying both new digests against GHCR:
+  `shoppipe` Application reached `Synced`/`Healthy` on both server and
+  client pods running the new images. A real bug turned up during this
+  step — see below — caught and fixed before it mattered.
+  End-to-end against the live cluster (not mocked, not local): register
+  → login → unauthenticated checkout (401) → checkout with the decline
+  test card (402, stock/orders untouched) → checkout with the success
+  test card (201, stock genuinely decremented — confirmed via
+  `GET /api/products/:id`) → `GET /api/orders/me` returns the confirmed
+  order. All five checks passed.
 
 ## Tasks accomplished
 
@@ -161,13 +187,24 @@ directory, an explicit include/exclude on the source), not a comment.
 - [x] Client auth context, protected routes, login/register/checkout/
       order-history pages, updated navbar
 - [x] `JWT_SECRET` wired through a Kubernetes Secret (imperative,
-      uncommitted), documented via an example manifest
+      uncommitted), documented via an example manifest kept outside the
+      ArgoCD-synced directory
 - [x] Fixed an unrelated pre-existing YAML corruption in
       `k8s/manifests/client.yaml` found at the start of this phase
-- [x] All new/updated tests green (`server`: 28/28, `client`: 4/4), both
+- [x] All new/updated tests green (`server`: 28/28, `client`: 27/27), both
       lints clean, client production build succeeds
-- [ ] Phase 7 images built/scanned/signed/published and live cluster
-      redeployed + re-verified (pending push)
+- [x] Fixed a real SonarCloud-flagged insecure-PRNG issue and closed a
+      genuine client test-coverage gap; quality gate green
+- [x] Phase 7 images built, Trivy-scanned, Cosign-signed, and published
+      via the existing pipeline; digests re-verified locally with
+      `cosign verify` before bumping the manifests
+- [x] Found and fixed a real bug during live redeploy: an "example"
+      secret template got applied for real by ArgoCD; relocated
+      structurally, bad live Secret replaced with a proper random one
+- [x] Live cluster redeployed and re-verified end to end: register,
+      login, unauthenticated-checkout rejection, decline-card rejection,
+      success-card checkout with a genuine stock decrement, and order
+      history — all confirmed directly against the running cluster
 
 ## What's next (Phase 8)
 

@@ -25,7 +25,7 @@ k8s/                Kubernetes manifests + ArgoCD Application (GitOps deployment
 | 4 | Supply Chain Security (Trivy, Syft, Cosign) | Complete — images signed and live in GHCR | [docs/phase-4.md](docs/phase-4.md) |
 | 5 | GitOps Deployment (Minikube + ArgoCD) | Complete — deployed, self-heal verified | [docs/phase-5.md](docs/phase-5.md) |
 | 6 | Observability (Prometheus + Grafana) | Complete — metrics pipeline verified end-to-end | [docs/phase-6.md](docs/phase-6.md) |
-| 7 | Feature Expansion + Full Pipeline Demo (auth, fake payment) | Code complete — pending image publish + live redeploy | [docs/phase-7.md](docs/phase-7.md) |
+| 7 | Feature Expansion + Full Pipeline Demo (auth, fake payment) | Complete — deployed and verified end-to-end on the live cluster | [docs/phase-7.md](docs/phase-7.md) |
 | 8 | Final Report | Not started | — |
 
 ## Local development
