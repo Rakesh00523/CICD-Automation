@@ -2,6 +2,8 @@
 // mirrors Stripe's published test-card convention (same well-known numbers,
 // same decline semantics) so the success/decline paths are reproducible and
 // recognizable rather than arbitrary made-up rules.
+const crypto = require('crypto');
+
 const DECLINE_CARDS = {
   '4000000000000002': 'Card declined: insufficient funds',
   '4000000000000069': 'Card declined: expired card',
@@ -52,7 +54,10 @@ async function charge({ cardNumber, expiry, cvc }, amount) {
 
   return {
     approved: true,
-    transactionId: `txn_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+    // crypto.randomUUID(), not Math.random() -- this becomes a persisted
+    // transaction identifier, which SonarCloud correctly flags as a
+    // security-sensitive use of a non-cryptographic PRNG (S2245).
+    transactionId: `txn_${crypto.randomUUID()}`,
     cardLast4: cardNumber.slice(-4),
     amount,
   };
