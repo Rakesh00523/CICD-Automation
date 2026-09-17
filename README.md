@@ -26,7 +26,7 @@ k8s/                Kubernetes manifests + ArgoCD Application (GitOps deployment
 | 5 | GitOps Deployment (Minikube + ArgoCD) | Complete — deployed, self-heal verified | [docs/phase-5.md](docs/phase-5.md) |
 | 6 | Observability (Prometheus + Grafana) | Complete — metrics pipeline verified end-to-end | [docs/phase-6.md](docs/phase-6.md) |
 | 7 | Feature Expansion + Full Pipeline Demo (auth, fake payment) | Complete — deployed and verified end-to-end on the live cluster | [docs/phase-7.md](docs/phase-7.md) |
-| 8 | Final Report | Not started | — |
+| 8 | Final Report | Complete | [docs/phase-8.md](docs/phase-8.md) |
 
 ## Local development
 
