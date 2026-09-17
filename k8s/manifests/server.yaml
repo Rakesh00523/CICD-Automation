@@ -22,10 +22,10 @@ spec:
           # published — not a mutable :latest tag. This is provably the
           # same artifact that passed the Trivy gate and carries a
           # verified Cosign signature, not just "whatever :latest is now".
-          # Bumped in Phase 6 to the build carrying prom-client
-          # instrumentation (docker-publish.yml run on commit 22506f7),
+          # Bumped in Phase 7 to the build carrying JWT auth + the fake
+          # payment gateway (docker-publish.yml run on commit 1480920),
           # re-verified with `cosign verify` before this bump.
-          image: ghcr.io/rakesh00523/cicd-automation/server@sha256:944067f01725d2892a0f213d14328d5468b538ce22d818279aea97dd65710d04
+          image: ghcr.io/rakesh00523/cicd-automation/server@sha256:5082bc337b8ef525b829d0393db14f75f1021ab265cd00d23ac84996b6ec591a
           ports:
             - name: http
               containerPort: 5000
@@ -35,8 +35,10 @@ spec:
             - name: MONGODB_URI
               value: mongodb://mongo:27017/ecommerce
             # From an imperatively-created Secret, not GitOps-managed --
-            # see server-secret.example.yaml for the shape and the
-            # kubectl command that creates the real one.
+            # see ../server-secret.example.yaml (one level up, deliberately
+            # outside this directory so ArgoCD's shoppipe Application,
+            # which syncs this whole directory, never applies it) for the
+            # shape and the kubectl command that creates the real one.
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:

@@ -18,13 +18,16 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: client
-          # Pinned to the exact digest Phase 4 scanned, signed, and
+          # Pinned to the exact digest the pipeline scanned, signed, and
           # published (see server.yaml for the full rationale). Built with
           # VITE_API_BASE_URL=http://localhost:5000/api baked in, so the
           # server must be reachable at localhost:5000 from the browser --
           # see docs/phase-5.md for the kubectl port-forward mapping that
-          # makes that true against this cluster.
-          image: ghcr.io/rakesh00523/cicd-automation/client@sha256:f591024ab63cf98d6ef16c54ef25f9efb581ca36f38b1d0c32c90103520d047c
+          # makes that true against this cluster. Bumped in Phase 7 to the
+          # build carrying the login/register/checkout/order-history UI
+          # (docker-publish.yml run on commit 1480920), re-verified with
+          # `cosign verify` before this bump.
+          image: ghcr.io/rakesh00523/cicd-automation/client@sha256:756f6bad995b353e273d01b8389c54bd76306e169545d8681186c4da6388c16e
           ports:
             - containerPort: 8080
           readinessProbe:

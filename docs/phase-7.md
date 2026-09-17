@@ -82,13 +82,40 @@ another CRUD field.
 **Kubernetes**
 - `k8s/manifests/server.yaml` — `JWT_SECRET` sourced from a
   `secretKeyRef` (`shoppipe-secrets` / `jwt-secret`).
-- `k8s/manifests/server-secret.example.yaml` — template only, real secret
-  created imperatively (see Scope decisions).
+- `k8s/server-secret.example.yaml` — template only, real secret created
+  imperatively (see Scope decisions and the bug below for exactly why it
+  lives here and not under `k8s/manifests/`).
 - Fixed an unrelated, pre-existing stray typo in
   `k8s/manifests/client.yaml` (`ty6apiVersion` → `apiVersion`) found while
   starting this phase — invalid YAML that would have broken any `kubectl
   apply`/ArgoCD sync touching that manifest; unrelated to the feature
   work itself.
+
+## A real bug found during live redeployment — the example Secret got applied for real
+
+The first version of the secret template lived at
+`k8s/manifests/server-secret.example.yaml`, commented "NOT applied
+automatically and NOT read by ArgoCD." That comment was wrong. The
+`shoppipe` ArgoCD `Application`'s source is `path: k8s/manifests` with no
+include/exclude filter — it applies *everything* in that directory, no
+exceptions for filenames that say "example." Confirmed live: after
+`minikube start` brought the cluster back and ArgoCD's controller
+resynced, `kubectl get secret shoppipe-secrets -n shoppipe -o yaml` showed
+a real Secret object, tracked by ArgoCD, whose `jwt-secret` value was the
+literal placeholder string committed in the file — a real signing key,
+publicly readable in the git history, sitting live in the cluster.
+
+Caught before any real exposure: `server.yaml`'s `JWT_SECRET` env var
+(pointing at this Secret) hadn't been pushed yet, so nothing had actually
+signed a token with it. Fixed properly, not just re-worded: moved the
+template to `k8s/server-secret.example.yaml` — one directory up, outside
+the `shoppipe` Application's synced path entirely — deleted the bad live
+Secret, and created the real one imperatively with a fresh
+cryptographically random value. The general lesson, worth stating plainly
+since it'll recur: **in a directory-sourced ArgoCD Application, every file
+in that directory is live infrastructure, regardless of what its name or
+a comment claims** — filtering has to be structural (a different
+directory, an explicit include/exclude on the source), not a comment.
 
 ## Tests
 
