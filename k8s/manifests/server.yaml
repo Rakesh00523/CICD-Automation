@@ -34,6 +34,14 @@ spec:
               value: "5000"
             - name: MONGODB_URI
               value: mongodb://mongo:27017/ecommerce
+            # From an imperatively-created Secret, not GitOps-managed --
+            # see server-secret.example.yaml for the shape and the
+            # kubectl command that creates the real one.
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: shoppipe-secrets
+                  key: jwt-secret
           readinessProbe:
             httpGet:
               path: /health

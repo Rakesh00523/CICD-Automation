@@ -3,18 +3,24 @@ import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { submitCheckout } from '../api';
 
+const initialPayment = { cardNumber: '', expiry: '', cvc: '' };
+
 export default function Checkout() {
   const { items, total, clearCart } = useCart();
+  const [payment, setPayment] = useState(initialPayment);
   const [order, setOrder] = useState(null);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const placeOrder = async () => {
+  const updatePaymentField = (field) => (e) => setPayment({ ...payment, [field]: e.target.value });
+
+  const placeOrder = async (e) => {
+    e.preventDefault();
     setSubmitting(true);
     setError(null);
     try {
       const payload = items.map(({ productId, quantity }) => ({ productId, quantity }));
-      const result = await submitCheckout(payload);
+      const result = await submitCheckout(payload, payment);
       setOrder(result);
       clearCart();
     } catch (err) {
@@ -46,7 +52,7 @@ export default function Checkout() {
   }
 
   return (
-    <div className="checkout">
+    <form className="checkout" onSubmit={placeOrder}>
       <h2>Review order</h2>
       {items.map((item) => (
         <div key={item.productId} className="checkout-row">
@@ -57,11 +63,41 @@ export default function Checkout() {
         </div>
       ))}
       <p className="cart-total">Total: ${total.toFixed(2)}</p>
-      <p className="notice">This is a mock checkout — no real payment is processed.</p>
+
+      <h3>Payment</h3>
+      <p className="notice">
+        Fake payment gateway — use 4242 4242 4242 4242 to succeed, or 4000 0000 0000 0002 /
+        4000 0000 0000 0069 to see a simulated decline. No real payment is processed.
+      </p>
+      <label>
+        Card number
+        <input
+          value={payment.cardNumber}
+          onChange={updatePaymentField('cardNumber')}
+          placeholder="4242424242424242"
+          maxLength={16}
+          required
+        />
+      </label>
+      <label>
+        Expiry (MM/YY)
+        <input
+          value={payment.expiry}
+          onChange={updatePaymentField('expiry')}
+          placeholder="12/99"
+          maxLength={5}
+          required
+        />
+      </label>
+      <label>
+        CVC
+        <input value={payment.cvc} onChange={updatePaymentField('cvc')} placeholder="123" maxLength={3} required />
+      </label>
+
       {error && <p className="error">{error}</p>}
-      <button onClick={placeOrder} disabled={submitting}>
+      <button type="submit" disabled={submitting}>
         {submitting ? 'Placing order…' : 'Place order'}
       </button>
-    </div>
+    </form>
   );
 }

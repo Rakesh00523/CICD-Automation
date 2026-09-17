@@ -23,6 +23,9 @@ services:
       PORT: 5000
       MONGODB_URI: mongodb://mongo:27017/ecommerce
       CLIENT_ORIGIN: http://localhost:5173
+      # Dev-only value -- compose is local-only, never deployed. The cluster
+      # gets its own value from a Kubernetes Secret (see k8s/manifests).
+      JWT_SECRET: dev-secret-change-me
     ports:
       - "5000:5000"
 

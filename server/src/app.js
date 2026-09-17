@@ -5,6 +5,8 @@ const mongoSanitize = require('express-mongo-sanitize');
 const { register, metricsMiddleware } = require('./metrics');
 const productsRouter = require('./routes/products');
 const checkoutRouter = require('./routes/checkout');
+const authRouter = require('./routes/auth');
+const ordersRouter = require('./routes/orders');
 
 function createApp() {
   const app = express();
@@ -27,6 +29,8 @@ function createApp() {
   });
   app.use('/api/products', productsRouter);
   app.use('/api/checkout', checkoutRouter);
+  app.use('/api/auth', authRouter);
+  app.use('/api/orders', ordersRouter);
 
   app.use((req, res) => res.status(404).json({ message: 'Not found' }));
 

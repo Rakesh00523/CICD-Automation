@@ -1,13 +1,17 @@
 const mongoose = require('mongoose');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
+const paymentGateway = require('../services/paymentGateway');
 
 async function checkout(req, res, next) {
   try {
-    const { items } = req.body;
+    const { items, payment } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'Cart is empty' });
+    }
+    if (!payment || typeof payment !== 'object') {
+      return res.status(400).json({ message: 'Payment details are required' });
     }
 
     // Merge repeated product IDs before validating stock — otherwise the same
@@ -42,13 +46,29 @@ async function checkout(req, res, next) {
       total += product.price * quantity;
     }
 
-    // Decrement stock for each purchased item. This is a mock checkout: no real
-    // payment is processed — a fake payment gateway is planned for a later phase.
+    // Charge before touching stock or creating the order -- a decline must
+    // leave everything exactly as it was.
+    const chargeResult = await paymentGateway.charge(payment, total);
+    if (!chargeResult.approved) {
+      return res.status(402).json({ message: chargeResult.reason });
+    }
+
+    // Decrement stock for each purchased item. This is a fake payment gateway
+    // (see server/src/services/paymentGateway.js): no real money moves.
     for (const [productId, quantity] of quantityByProductId) {
       await Product.updateOne({ _id: productId }, { $inc: { stock: -quantity } });
     }
 
-    const order = await Order.create({ items: orderItems, total, status: 'confirmed' });
+    const order = await Order.create({
+      user: req.user.id,
+      items: orderItems,
+      total,
+      status: 'confirmed',
+      payment: {
+        transactionId: chargeResult.transactionId,
+        cardLast4: chargeResult.cardLast4,
+      },
+    });
 
     res.status(201).json({
       orderId: order._id,
